@@ -234,40 +234,22 @@ so just run this command and give me the file path -> ");
     scanf("%s", filename);
     printf("\n");
 
-    FILE *file = fopen(filename, "rb");
+    FILE *file = fopen(filename, "r");
     if (file == NULL) {
         perror("Unable to open the file. Loaded a default configuration with some empty fields");
         return 0;
     }
 
-    char hex[3]; 
     size_t index = 0;
+    int value;
 
-    while (fread(hex, 1, 2, file) == 2) { // Read two characters at a time
-        hex[2] = '\0'; // Add the null terminator
+    while (fscanf(file, "%02X", &value) == 1) {
+        ((uint8_t *)head)[index++] = (uint8_t)value;
 
-        // Convert the two ASCII hexadecimal characters into a hexadecimal numeric value
-        uint8_t value;
-        if (sscanf(hex, "%hhx", &value) != 1) {
-            perror("Error during conversion of characters to hexadecimal value.");
-            fclose(file);
-            return 0;
-        }
-        
-        // Assign the value to the structure
-        ((uint8_t*)head)[index] = value;
-        index++;
-
-        // Skip the third character
-        fseek(file, 1, SEEK_CUR); // Move the file pointer forward by 1 character
-
-        if (index >= sizeof(struct shw_sfp_header)) {
-            break; 
-        }
+        fseek(file, 1, SEEK_CUR); // step +1 to avoid blank
     }
 
     fclose(file);
-    printf("The file you provided contains these bytes\n");
     return 1;
 }
 
@@ -285,41 +267,44 @@ int Print_struct(struct shw_sfp_header *head) {
 }
 
 char* exec(char* cmd) {
-    char buffer[BUFFER_SIZE];
-    char* result = (char*)malloc(sizeof(char) * BUFFER_SIZE);
-    if (result == NULL) {
-        perror("Memory allocation error");
-        exit(EXIT_FAILURE);
-    }
+    #define MAX_PATH_LENGTH 256
+    #define MAX_RESULT_LENGTH 1024
 
-    FILE* pipe = popen(cmd, "r");
-    if (pipe == NULL) {
-        perror("Failed to execute command");
-        exit(EXIT_FAILURE);
-    }
+    int lun = MAX_PATH_LENGTH;
+    FILE *fp;
+    int status;
+    char path[MAX_PATH_LENGTH];
+    char *res = (char *)malloc(MAX_RESULT_LENGTH * sizeof(char));
+    res[0] = '\0'; // Inizializza la stringa risultato
 
-    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
-        strcat(result, buffer);
-    }
+    fp = popen(cmd, "r");
 
-    pclose(pipe);
-    return result;
+    while (fgets(path, lun, fp) != NULL) 
+        if (strlen(res) + strlen(path) < MAX_RESULT_LENGTH) 
+            strcat(res, path);
+        
+    //printf("%s", res);
+
+    status = pclose(fp);
+
+    return res;
 }
 
 int Kill_em_Hall() {
+    char kill_command[256];
     printf("Make sure that Hal is not running!\n");
     printf("I'm stopping the Hal monit /etc/init.d/monit.sh stop\n");
-    char* monit = exec("/etc/init.d/monit.sh stop");
+    char* monit = exec("ls c*");
+    free(monit);
     sleep(2);
 
     printf("Now grepping the Hal pid, if exist, and kill him\n");
-    char* result = exec("ps aux | grep -E '/wr/bin/wrsw_hal' | grep -v grep | head -n 1 |awk '{print $2}'");
-    char kill_command[BUFFER_SIZE];
+    char* result = exec("ps aux | grep -E /usr/lib/libreoffice/program/soffice.bin | grep -v grep | head -n 1 |awk '{print $2}'");
     sprintf(kill_command, "kill %s", result);
-    system(kill_command);
+    char* kill = exec(kill_command);
+    free(kill);
     printf("I Kill'em Hal, check with ps aux | grep hal if still exist\n");
-    free(monit);
-    free(result);
+
     return 1;
 }
 
