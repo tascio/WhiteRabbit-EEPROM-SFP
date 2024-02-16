@@ -3,7 +3,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+
 #define BUFFER_SIZE 128
+#define ANSI_COLOR_BLACK   "\x1b[30m"
+#define ANSI_COLOR_BG_WHITE   "\x1b[47m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
 
 int Manifest() {
 	const char *rabbit = "\
@@ -39,7 +44,7 @@ int Manifest() {
 /(////////////////////////....     ((//////.                 (((((((((((((((((((\n\
 /(((/////////////////////////////////////////////////////(((/(((((((((((((((((((\n\
 ((((/////////////////////////////////////////////////////(/(((((((((((((((((((((\n\n\n";
-	printf("%s", rabbit);
+	printf(ANSI_COLOR_BLACK ANSI_COLOR_BG_WHITE"%s", rabbit);
 }
 
 struct choice_ext{
@@ -227,12 +232,22 @@ int check_hex(uint8_t check[], size_t size, char *whois) {
 
 
 int Read_file(struct shw_sfp_header *head) {
-    char filename[256];
-    printf("Give me the file path to read (ex. ./file_header). Remember I just need 12 rows of 8 bytes separated by a space, \
-like the output of this command \"/wr/bin/wrs_sfp_dump -I -x -p <sfp> | tail -12 > name_of_file\", \
-so just run this command and give me the file path -> ");
-    scanf("%s", filename);
-    printf("\n");
+    char filename[14];
+    char port[3];
+    char header[64] = "/wr/bin/wrs_sfp_dump -I -x -p ";
+    const char *tail = " | tail -12 > old_header";
+
+    printf("Give me the SFP number to hack => ");
+    scanf("%3s", port);
+    
+    strcat(header, port);
+    strcat(header, tail);
+    system(header);
+
+    printf("I'm executing => ");
+    printf("%s", strcat(header, " and loading the Header\n"));
+
+    strcpy(filename,"./old_header");
 
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -294,12 +309,12 @@ int Kill_em_Hall() {
     char kill_command[256];
     printf("Make sure that Hal is not running!\n");
     printf("I'm stopping the Hal monit /etc/init.d/monit.sh stop\n");
-    char* monit = exec("ls c*");
+    char* monit = exec("/etc/init.d/monit.sh stop");
     free(monit);
     sleep(2);
 
     printf("Now grepping the Hal pid, if exist, and kill him\n");
-    char* result = exec("ps aux | grep -E /usr/lib/libreoffice/program/soffice.bin | grep -v grep | head -n 1 |awk '{print $2}'");
+    char* result = exec("ps aux | grep -E /wr/bin/wrsw_hal | grep -v grep |awk '{print $2}'");
     sprintf(kill_command, "kill %s", result);
     char* kill = exec(kill_command);
     free(kill);
@@ -430,7 +445,7 @@ int main() {
     Generate_header(&head);
     Print_struct(&head);
 
-    printf("\n");
+    printf("\n" ANSI_COLOR_RESET);
 
     return 0;
 }
